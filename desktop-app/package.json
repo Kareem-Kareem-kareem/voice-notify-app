@@ -1,1 +1,39 @@
-
+{
+  "name": "@workspace/desktop-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Voice Alert Receiver - plays broadcast voice alerts sent from the admin app until dismissed by the admin",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "typecheck": "node -e \"process.exit(0)\""
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.voicealert.receiver",
+    "productName": "Voice Alert Receiver",
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "icon": "assets/icon.png",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
