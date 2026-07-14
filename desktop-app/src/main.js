@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, shell } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage } = require("electron");
 const path = require("path");
 
 const { loadConfig, saveConfig, isConfigured } = require("./config");
@@ -6,7 +6,6 @@ const { registerDesktop, fetchActiveMessages, wsUrl } = require("./api");
 const { connectWebSocket } = require("./wsClient");
 const { createAlertManager } = require("./alertLoop");
 const { DEFAULT_SERVER_URL } = require("./constants");
-const { log, logPath } = require("./log");
 
 // Pin the app name explicitly. Without this, Electron derives the name (and
 // therefore the userData/config folder) from package.json's "name" field,
@@ -18,23 +17,9 @@ const { log, logPath } = require("./log");
 app.setName("Voice Alert Receiver");
 
 if (!app.requestSingleInstanceLock()) {
-  // Another instance (likely an older build still resident in the tray
-  // from a previous test/session) already holds the lock. Quitting here is
-  // correct, but silently -- if the user double-clicks the new .exe
-  // expecting to reach setup, this exit is invisible and they end up
-  // interacting with the OLD instance's tray/setup window instead, which
-  // runs stale code with none of the fixes below (including logging).
   app.quit();
   process.exit(0);
 }
-
-// If a second launch happens while this instance is running, bring the
-// setup window forward instead of doing nothing -- this is what the user
-// is actually looking at when they think they're running a fresh build.
-app.on("second-instance", () => {
-  log("second-instance event: another launch attempt was redirected here");
-  openSetupWindow(true);
-});
 
 let tray = null;
 let setupWindow = null;
@@ -42,6 +27,11 @@ let playerWindow = null;
 let wsHandle = null;
 let alertManager = null;
 let connected = false;
+
+function log(message) {
+  // eslint-disable-next-line no-console
+  console.log(`[voice-alert] ${message}`);
+}
 
 function iconPath() {
   return path.join(__dirname, "..", "assets", "icon.png");
@@ -86,10 +76,6 @@ function updateTray() {
       {
         label: "Change nickname",
         click: () => openSetupWindow(true),
-      },
-      {
-        label: "Open log file",
-        click: () => shell.openPath(logPath()),
       },
       { type: "separator" },
       { label: "Quit Voice Alert Receiver", click: () => app.quit() },
@@ -226,25 +212,14 @@ ipcMain.handle("setup:submit", async (_event, { nickname }) => {
 
     await startConnection();
     updateTray();
-    log(`Setup complete: nickname="${nickname}" clientId=${clientId}`);
 
     return { ok: true };
   } catch (err) {
-    // Never surface a blank error -- an empty/undefined message here is
-    // exactly what makes a failure look like "nothing happened" to the user.
-    const message = (err && err.message) || String(err) || "Unknown error";
-    log(`Setup failed: ${message}`);
-    return { ok: false, error: message };
+    return { ok: false, error: err.message };
   }
 });
 
 app.whenReady().then(async () => {
-  // Always write a startup marker. If this line is missing from the log
-  // file after a test, the app that ran was not this build -- most likely
-  // a stale/old instance was still running in the background (see
-  // requestSingleInstanceLock above) and intercepted the launch.
-  log(`App starting. version=${app.getVersion()} userData=${app.getPath("userData")}`);
-
   app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true });
 
   createPlayerWindow();
