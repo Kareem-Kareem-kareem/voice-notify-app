@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, shell } = require("electron");
 const path = require("path");
 
 const { loadConfig, saveConfig, isConfigured } = require("./config");
@@ -6,6 +6,7 @@ const { registerDesktop, fetchActiveMessages, wsUrl } = require("./api");
 const { connectWebSocket } = require("./wsClient");
 const { createAlertManager } = require("./alertLoop");
 const { DEFAULT_SERVER_URL } = require("./constants");
+const { log, logPath } = require("./log");
 
 // Pin the app name explicitly. Without this, Electron derives the name (and
 // therefore the userData/config folder) from package.json's "name" field,
@@ -27,11 +28,6 @@ let playerWindow = null;
 let wsHandle = null;
 let alertManager = null;
 let connected = false;
-
-function log(message) {
-  // eslint-disable-next-line no-console
-  console.log(`[voice-alert] ${message}`);
-}
 
 function iconPath() {
   return path.join(__dirname, "..", "assets", "icon.png");
@@ -76,6 +72,10 @@ function updateTray() {
       {
         label: "Change nickname",
         click: () => openSetupWindow(true),
+      },
+      {
+        label: "Open log file",
+        click: () => shell.openPath(logPath()),
       },
       { type: "separator" },
       { label: "Quit Voice Alert Receiver", click: () => app.quit() },
@@ -212,10 +212,15 @@ ipcMain.handle("setup:submit", async (_event, { nickname }) => {
 
     await startConnection();
     updateTray();
+    log(`Setup complete: nickname="${nickname}" clientId=${clientId}`);
 
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err.message };
+    // Never surface a blank error -- an empty/undefined message here is
+    // exactly what makes a failure look like "nothing happened" to the user.
+    const message = (err && err.message) || String(err) || "Unknown error";
+    log(`Setup failed: ${message}`);
+    return { ok: false, error: message };
   }
 });
 
