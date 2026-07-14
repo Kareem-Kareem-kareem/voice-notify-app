@@ -23,15 +23,10 @@ form.addEventListener("submit", async (event) => {
   submitButton.disabled = true;
   submitButton.textContent = "Connecting...";
 
-  let result;
-  try {
-    result = await ipcRenderer.invoke("setup:submit", { nickname });
-  } catch (err) {
-    result = { ok: false, error: (err && err.message) || String(err) };
-  }
+  const result = await ipcRenderer.invoke("setup:submit", { nickname });
 
-  if (!result || !result.ok) {
-    errorEl.textContent = (result && result.error) || "Something went wrong. Please try again.";
+  if (!result.ok) {
+    errorEl.textContent = result.error;
     submitButton.disabled = false;
     submitButton.textContent = "Save & Connect";
   }
