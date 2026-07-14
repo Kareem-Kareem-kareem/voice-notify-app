@@ -5,6 +5,16 @@ const { loadConfig, saveConfig, isConfigured } = require("./config");
 const { registerDesktop, fetchActiveMessages, wsUrl } = require("./api");
 const { connectWebSocket } = require("./wsClient");
 const { createAlertManager } = require("./alertLoop");
+const { DEFAULT_SERVER_URL } = require("./constants");
+
+// Pin the app name explicitly. Without this, Electron derives the name (and
+// therefore the userData/config folder) from package.json's "name" field,
+// which is the scoped workspace name "@workspace/desktop-app". That name can
+// resolve to a different userData path depending on how the app is launched
+// (e.g. `pnpm start` during development vs. the packaged installer), which
+// would make saved config from one launch invisible to the other, and look
+// like setup never "stuck" between runs.
+app.setName("Voice Alert Receiver");
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -64,7 +74,7 @@ function updateTray() {
       },
       { type: "separator" },
       {
-        label: "Reconfigure server / nickname",
+        label: "Change nickname",
         click: () => openSetupWindow(true),
       },
       { type: "separator" },
@@ -175,16 +185,18 @@ async function catchUpActiveMessages(config) {
 
 ipcMain.handle("setup:get-defaults", () => {
   const config = loadConfig();
-  return { serverUrl: config.serverUrl ?? "", nickname: config.nickname ?? "" };
+  return { nickname: config.nickname ?? "" };
 });
 
-ipcMain.handle("setup:submit", async (_event, { serverUrl, nickname }) => {
+ipcMain.handle("setup:submit", async (_event, { nickname }) => {
   try {
     const existing = loadConfig();
+    const serverUrl = DEFAULT_SERVER_URL;
 
     // Only register once per machine; reuse the existing id on future edits
-    // (e.g. renaming) unless the server address changed, which implies a
-    // different server/database that has never seen this client before.
+    // (e.g. renaming) unless the baked-in server address changed since the
+    // last build/run, which implies a different server/database that has
+    // never seen this client before.
     let clientId = existing.clientId;
     if (!clientId || existing.serverUrl !== serverUrl) {
       const registered = await registerDesktop(serverUrl, nickname);
