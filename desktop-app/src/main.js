@@ -18,9 +18,23 @@ const { log, logPath } = require("./log");
 app.setName("Voice Alert Receiver");
 
 if (!app.requestSingleInstanceLock()) {
+  // Another instance (likely an older build still resident in the tray
+  // from a previous test/session) already holds the lock. Quitting here is
+  // correct, but silently -- if the user double-clicks the new .exe
+  // expecting to reach setup, this exit is invisible and they end up
+  // interacting with the OLD instance's tray/setup window instead, which
+  // runs stale code with none of the fixes below (including logging).
   app.quit();
   process.exit(0);
 }
+
+// If a second launch happens while this instance is running, bring the
+// setup window forward instead of doing nothing -- this is what the user
+// is actually looking at when they think they're running a fresh build.
+app.on("second-instance", () => {
+  log("second-instance event: another launch attempt was redirected here");
+  openSetupWindow(true);
+});
 
 let tray = null;
 let setupWindow = null;
@@ -225,6 +239,12 @@ ipcMain.handle("setup:submit", async (_event, { nickname }) => {
 });
 
 app.whenReady().then(async () => {
+  // Always write a startup marker. If this line is missing from the log
+  // file after a test, the app that ran was not this build -- most likely
+  // a stale/old instance was still running in the background (see
+  // requestSingleInstanceLock above) and intercepted the launch.
+  log(`App starting. version=${app.getVersion()} userData=${app.getPath("userData")}`);
+
   app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true });
 
   createPlayerWindow();
